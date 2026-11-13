@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 
 import 'models/services/banco_local_service.dart';
+import 'models/services/documento_storage_service.dart';
 import 'models/services/preferences_service.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/documentos_viewmodel.dart';
 import 'views/cadastro_view.dart';
+import 'views/editor_view.dart';
 import 'views/home_view.dart';
 import 'views/login_view.dart';
 
-void main() {
+Future<void> main() async {
+  // Necessário porque o shared_preferences é usado antes do runApp.
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Os serviços e ViewModels são criados uma única vez e entregues às views.
-  final auth = AuthViewModel(PreferencesService(), BancoLocalService());
-  final docs = DocumentosViewModel();
+  final banco = BancoLocalService(DocumentoStorageService());
+  final auth = AuthViewModel(PreferencesService(), banco);
+  final docs = DocumentosViewModel(banco);
+
+  // Restaura o que foi salvo: tema/fonte, sessão do usuário e documentos.
+  await auth.aplicarPreferenciasSalvas();
+  await auth.restaurarSessao();
+  await docs.carregar();
+
   runApp(MeuApp(auth: auth, docs: docs));
 }
 
@@ -64,11 +76,12 @@ class MeuApp extends StatelessWidget {
               child: child!,
             );
           },
-          initialRoute: '/',
+          initialRoute: auth.usuarioLogado != null ? '/home' : '/',
           routes: {
             '/': (context) => LoginView(auth: auth),
             '/cadastro': (context) => CadastroView(auth: auth),
             '/home': (context) => HomeView(auth: auth, docs: docs),
+            '/editor': (context) => EditorView(docs: docs),
           },
         );
       },

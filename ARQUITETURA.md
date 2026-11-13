@@ -70,3 +70,27 @@ Nas views ficaram apenas objetos de interface: `GlobalKey<FormState>` e `TextEdi
    - Home: o corpo escuta o `DocumentosViewModel` (lista, item selecionado e modo leitura).
 3. A Home também registra `addListener` no `DocumentosViewModel` para preencher os `TextEditingController` quando outro documento é selecionado.
 4. Fluxo de um clique: `onPressed` → método do ViewModel → muda o estado → `notifyListeners()` → `ListenableBuilder` reconstrói a interface.
+
+---
+
+# Fase 2: CRUD e persistência local
+
+Com a base MVVM validada, a persistência passou a ser permanente. Como o preview roda na **web** (`web-server`), não foi usado SQLite nativo (`sqflite`). Foi aplicado o padrão **Service/Repository** com `shared_preferences` em duas frentes, ambas dentro de `lib/models/services/`.
+
+| Arquivo | O que persiste | Como |
+|---|---|---|
+| `preferences_service.dart` | Tema (`bool`), tamanho da fonte (`double`) e dados da sessão (`String` de nome e e-mail) | Chave-valor simples: `setBool`, `setDouble`, `setString` |
+| `documento_storage_service.dart` | Lista de documentos (CRUD completo) | A lista de `Documento` é serializada com `jsonEncode` (`toJson`) e gravada em uma única chave; na leitura, `jsonDecode` + `fromJson` reconstroem os objetos |
+| `banco_local_service.dart` | Usuários (cadastro/login) e porta de entrada dos documentos | Usuários: mesma técnica de JSON, e eles sobrevivem ao recarregar a página. Documentos: `listarDocumentos`, `inserirDocumento`, `atualizarDocumento` e `excluirDocumento` repassam a chamada ao `DocumentoStorageService` |
+
+## Novidades da fase 2
+- **`views/editor_view.dart` (rota `/editor`)**: quarta tela, usada para criar e editar. Sem argumento, cria um documento; com um `Documento` como argumento, edita e permite excluir. Tem título (validado), tipo (texto, PDF ou nota), corpo, modo leitura e exportar PDF (simulado).
+- **`DocumentosViewModel`**: deixou de guardar a lista em memória e passou a expor o CRUD por meio do `BancoLocalService`, que delega ao `DocumentoStorageService`: `carregar()` (Read), `criar()` (Create), `atualizar()` (Update) e `excluir()` (Delete). Cada operação grava e depois chama `notifyListeners()`, e a `HomeView` se atualiza sozinha por meio de `ListenableBuilder`.
+- **`HomeView`**: virou `StatelessWidget`. Lista os documentos (toque abre o editor, ícone da lixeira exclui com confirmação) e tem o botão "Novo documento".
+- **Sessão persistente**: `AuthViewModel.login()` grava a sessão, `restaurarSessao()` a lê ao abrir o app (o app já abre na Home) e `logout()` a apaga.
+- **Tema persistente**: o `main()` agora é `async`, chama `WidgetsFlutterBinding.ensureInitialized()` e aplica as preferências salvas antes do `runApp`.
+
+## Teste de persistência (F5 no preview)
+1. Cadastre um usuário escolhendo o **Tema Escuro** e faça login.
+2. Crie, edite e exclua documentos pelo botão "Novo documento" e pela lista.
+3. Recarregue a página do preview (F5): o tema escuro, a sessão (o app abre direto na Home), os usuários e os documentos criados ou editados continuam lá.

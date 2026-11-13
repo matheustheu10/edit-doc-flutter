@@ -1,69 +1,44 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/documento.dart';
+import '../models/services/banco_local_service.dart';
 
-// VIEWMODEL: lista de documentos e estado do editor da Home.
+// VIEWMODEL: listagem e operações CRUD dos documentos.
+// Toda operação passa pelo BancoLocalService (persistência) e depois notifica as views.
 class DocumentosViewModel extends ChangeNotifier {
-  final List<Documento> _documentos = [
-    const Documento(
-      id: 1,
-      titulo: 'Governança de TI.pdf',
-      tipo: 'pdf',
-      texto:
-          'A governança de TI garante que a tecnologia apoie os objetivos do negócio.',
-    ),
-    const Documento(
-      id: 2,
-      titulo: 'Resumo da aula.txt',
-      tipo: 'txt',
-      texto: 'Rotas nomeadas permitem navegar entre telas usando um nome único.',
-    ),
-    const Documento(
-      id: 3,
-      titulo: 'Ideias do projeto',
-      tipo: 'nota',
-      texto: 'Tela de login, cadastro e editor de documentos.',
-    ),
-  ];
+  DocumentosViewModel(this._banco);
 
-  int _indiceSelecionado = 0;
-  bool _modoLeitura = false;
+  final BancoLocalService _banco;
+
+  List<Documento> _documentos = [];
 
   List<Documento> get documentos => List.unmodifiable(_documentos);
-  int get indiceSelecionado => _indiceSelecionado;
-  Documento get selecionado => _documentos[_indiceSelecionado];
-  bool get modoLeitura => _modoLeitura;
 
-  void abrir(int indice) {
-    _indiceSelecionado = indice;
+  /// READ
+  Future<void> carregar() async {
+    _documentos = await _banco.listarDocumentos();
     notifyListeners();
   }
 
-  void novo() {
-    final proximoId = _documentos.fold<int>(0, (m, d) => d.id > m ? d.id : m) + 1;
-    _documentos.add(Documento(
-      id: proximoId,
-      titulo: 'Documento ${_documentos.length + 1}',
-      tipo: 'txt',
-      texto: '',
-    ));
-    _indiceSelecionado = _documentos.length - 1;
-    _modoLeitura = false;
-    notifyListeners();
+  /// CREATE
+  Future<void> criar({
+    required String titulo,
+    required String tipo,
+    required String texto,
+  }) async {
+    await _banco.inserirDocumento(titulo: titulo.trim(), tipo: tipo, texto: texto);
+    await carregar();
   }
 
-  /// Guarda na lista o que está no editor.
-  void salvarAtual(String titulo, String texto) {
-    final t = titulo.trim();
-    _documentos[_indiceSelecionado] = selecionado.copyWith(
-      titulo: t.isEmpty ? 'Sem título' : t,
-      texto: texto,
-    );
-    notifyListeners();
+  /// UPDATE
+  Future<void> atualizar(Documento documento) async {
+    await _banco.atualizarDocumento(documento);
+    await carregar();
   }
 
-  void alternarModoLeitura() {
-    _modoLeitura = !_modoLeitura;
-    notifyListeners();
+  /// DELETE
+  Future<void> excluir(int id) async {
+    await _banco.excluirDocumento(id);
+    await carregar();
   }
 }

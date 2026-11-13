@@ -42,6 +42,19 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Ao abrir o app: se houver sessão salva e o usuário ainda existir, entra direto.
+  Future<void> restaurarSessao() async {
+    final sessao = await _prefs.carregarSessao();
+    if (sessao == null) return;
+    final usuario = await _banco.buscarPorEmail(sessao.email);
+    if (usuario == null) {
+      await _prefs.limparSessao();
+      return;
+    }
+    _usuarioLogado = usuario;
+    notifyListeners();
+  }
+
   /// Lê o que está salvo e aplica no app inteiro.
   Future<void> aplicarPreferenciasSalvas() async {
     final p = await _prefs.carregarPreferencias();
@@ -63,6 +76,7 @@ class AuthViewModel extends ChangeNotifier {
     final usuario = await _banco.autenticar(email, senha);
     if (usuario != null) {
       _usuarioLogado = usuario;
+      await _prefs.salvarSessao(usuario.nome, usuario.email);
       await aplicarPreferenciasSalvas();
     }
 
@@ -91,8 +105,9 @@ class AuthViewModel extends ChangeNotifier {
     return inserido;
   }
 
-  void logout() {
+  Future<void> logout() async {
     _usuarioLogado = null;
+    await _prefs.limparSessao();
     notifyListeners();
   }
 }
